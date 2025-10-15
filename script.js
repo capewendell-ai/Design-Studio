@@ -71,26 +71,52 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function handleFileSelect(file) {
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select a valid image file.');
-            return;
-        }
+        try {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showNotification('Please select a valid image file (JPG, PNG, GIF, etc.)', 'error');
+                return;
+            }
 
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            alert('File size must be less than 10MB.');
-            return;
-        }
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                showNotification('File size must be less than 10MB.', 'error');
+                return;
+            }
 
-        // Create preview
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImg.src = e.target.result;
-            uploadArea.style.display = 'none';
-            previewArea.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
+            // Validate file size (min 1KB)
+            if (file.size < 1024) {
+                showNotification('File size is too small. Please select a valid image.', 'error');
+                return;
+            }
+
+            console.log('File selected:', file.name, file.type, file.size, 'bytes');
+
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    previewImg.src = e.target.result;
+                    uploadArea.style.display = 'none';
+                    previewArea.style.display = 'block';
+                    showNotification(`Image uploaded successfully: ${file.name}`, 'success');
+                } catch (error) {
+                    console.error('Error creating preview:', error);
+                    showNotification('Error creating image preview', 'error');
+                }
+            };
+            
+            reader.onerror = function() {
+                console.error('Error reading file:', reader.error);
+                showNotification('Error reading the selected file', 'error');
+            };
+            
+            reader.readAsDataURL(file);
+            
+        } catch (error) {
+            console.error('Error handling file selection:', error);
+            showNotification('Error processing the selected file', 'error');
+        }
     }
 });
 
@@ -136,28 +162,40 @@ function generateImage() {
     generateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Generating...</span>';
     generateButton.disabled = true;
 
-    // Prepare data for the webhook
-    const requestData = {
-        prompt: prompt,
-        style: style,
-        quality: quality,
-        timestamp: new Date().toISOString(),
-        hasReferenceImage: fileInput.files.length > 0
-    };
+    // Prepare FormData for the webhook (to include file upload)
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('style', style);
+    formData.append('quality', quality);
+    formData.append('timestamp', new Date().toISOString());
+    formData.append('userAgent', navigator.userAgent);
+    formData.append('screenResolution', `${screen.width}x${screen.height}`);
+    formData.append('language', navigator.language);
+    
+    // Add the uploaded image file if it exists
+    if (fileInput.files.length > 0) {
+        formData.append('referenceImage', fileInput.files[0]);
+        formData.append('hasReferenceImage', 'true');
+        formData.append('imageFileName', fileInput.files[0].name);
+        formData.append('imageFileSize', fileInput.files[0].size.toString());
+        formData.append('imageFileType', fileInput.files[0].type);
+        console.log('Image file added:', fileInput.files[0].name, fileInput.files[0].size, 'bytes');
+    } else {
+        formData.append('hasReferenceImage', 'false');
+    }
 
     // Send request to n8n webhook
     const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
     
     console.log('Sending request to:', webhookUrl);
-    console.log('Request data:', requestData);
+    console.log('FormData contents:');
+    for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+    }
     
     fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        },
-        body: JSON.stringify(requestData),
+        body: formData, // Use FormData instead of JSON
         mode: 'cors' // Explicitly set CORS mode
     })
     .then(response => {
