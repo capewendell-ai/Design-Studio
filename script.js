@@ -146,18 +146,38 @@ function generateImage() {
     };
 
     // Send request to n8n webhook
-    fetch('https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image', {
+    const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
+    
+    console.log('Sending request to:', webhookUrl);
+    console.log('Request data:', requestData);
+    
+    fetch(webhookUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
+        mode: 'cors' // Explicitly set CORS mode
     })
     .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Try to get error message from response
+            return response.text().then(text => {
+                throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+            });
         }
-        return response.json();
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            return response.text();
+        }
     })
     .then(data => {
         // Reset button state
@@ -170,10 +190,11 @@ function generateImage() {
         // Log the response for debugging
         console.log('Webhook response:', data);
         
-        // Here you can handle the response data
-        // For example, if the API returns an image URL, you could display it
-        if (data.imageUrl) {
+        // Handle the response data
+        if (typeof data === 'object' && data.imageUrl) {
             displayGeneratedImage(data.imageUrl);
+        } else if (typeof data === 'object' && data.message) {
+            console.log('Workflow message:', data.message);
         }
     })
     .catch(error => {
@@ -181,10 +202,13 @@ function generateImage() {
         generateButton.innerHTML = originalContent;
         generateButton.disabled = false;
         
-        // Show error message
+        // Show detailed error message
+        console.error('Full error details:', error);
         showNotification(`Error: ${error.message}`, 'error');
         
-        console.error('Error calling webhook:', error);
+        // Additional debugging info
+        console.error('Request URL:', webhookUrl);
+        console.error('Request data:', requestData);
     });
 }
 
@@ -370,6 +394,29 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// Test webhook function (for debugging)
+function testWebhook() {
+    const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
+    console.log('Testing webhook URL:', webhookUrl);
+    
+    fetch(webhookUrl, {
+        method: 'GET',
+        mode: 'cors'
+    })
+    .then(response => {
+        console.log('Test response status:', response.status);
+        return response.text();
+    })
+    .then(data => {
+        console.log('Test response data:', data);
+        showNotification('Webhook test successful!', 'success');
+    })
+    .catch(error => {
+        console.error('Webhook test error:', error);
+        showNotification(`Webhook test failed: ${error.message}`, 'error');
+    });
+}
+
 // Utility function to show tab (accessible from global scope)
 function showTab(tabId) {
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -388,3 +435,25 @@ function showTab(tabId) {
         activePane.classList.add('active');
     }
 }
+
+// Add test button for debugging (remove in production)
+document.addEventListener('DOMContentLoaded', function() {
+    // Add a test button for debugging webhook connectivity
+    const testButton = document.createElement('button');
+    testButton.textContent = 'Test Webhook';
+    testButton.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        z-index: 1000;
+    `;
+    testButton.onclick = testWebhook;
+    document.body.appendChild(testButton);
+});
