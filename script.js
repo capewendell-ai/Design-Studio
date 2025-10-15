@@ -193,61 +193,128 @@ function generateImage() {
         console.log(key, value);
     }
     
-    fetch(webhookUrl, {
+    // Try multiple approaches for sending data
+    const fetchOptions = {
         method: 'POST',
-        body: formData, // Use FormData instead of JSON
-        mode: 'cors' // Explicitly set CORS mode
-    })
-    .then(response => {
-        console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
+        body: formData,
+        mode: 'cors',
+        credentials: 'omit' // Don't send cookies
+    };
+    
+    console.log('Fetch options:', fetchOptions);
+    
+    // Function to attempt the request
+    function attemptRequest(options, attemptNumber = 1) {
+        console.log(`Attempt ${attemptNumber} with options:`, options);
         
-        if (!response.ok) {
-            // Try to get error message from response
-            return response.text().then(text => {
-                throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
-            });
-        }
-        
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return response.json();
-        } else {
-            return response.text();
-        }
-    })
-    .then(data => {
-        // Reset button state
-        generateButton.innerHTML = originalContent;
-        generateButton.disabled = false;
-        
-        // Show success message
-        showNotification('Image generation request sent successfully!', 'success');
-        
-        // Log the response for debugging
-        console.log('Webhook response:', data);
-        
-        // Handle the response data
-        if (typeof data === 'object' && data.imageUrl) {
-            displayGeneratedImage(data.imageUrl);
-        } else if (typeof data === 'object' && data.message) {
-            console.log('Workflow message:', data.message);
-        }
-    })
-    .catch(error => {
-        // Reset button state
-        generateButton.innerHTML = originalContent;
-        generateButton.disabled = false;
-        
-        // Show detailed error message
-        console.error('Full error details:', error);
-        showNotification(`Error: ${error.message}`, 'error');
-        
-        // Additional debugging info
-        console.error('Request URL:', webhookUrl);
-        console.error('Request data:', requestData);
-    });
+        return fetch(webhookUrl, options)
+        .then(response => {
+            console.log(`Attempt ${attemptNumber} - Response status:`, response.status);
+            console.log(`Attempt ${attemptNumber} - Response headers:`, response.headers);
+            
+            if (!response.ok) {
+                // Try to get error message from response
+                return response.text().then(text => {
+                    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+                });
+            }
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                return response.text();
+            }
+        })
+        .then(data => {
+            // Reset button state
+            generateButton.innerHTML = originalContent;
+            generateButton.disabled = false;
+            
+            // Show success message
+            showNotification('Image generation request sent successfully!', 'success');
+            
+            // Log the response for debugging
+            console.log(`Attempt ${attemptNumber} - Webhook response:`, data);
+            
+            // Handle the response data
+            if (typeof data === 'object' && data.imageUrl) {
+                displayGeneratedImage(data.imageUrl);
+            } else if (typeof data === 'object' && data.message) {
+                console.log('Workflow message:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error(`Attempt ${attemptNumber} failed:`, error);
+            
+            // If this is the first attempt and it's a network error, try a fallback
+            if (attemptNumber === 1 && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+                console.log('First attempt failed with network error, trying fallback...');
+                
+                // Fallback: Try without FormData (send as JSON with base64 image)
+                const fallbackData = {
+                    prompt: prompt,
+                    style: style,
+                    quality: quality,
+                    timestamp: new Date().toISOString(),
+                    userAgent: navigator.userAgent,
+                    screenResolution: `${screen.width}x${screen.height}`,
+                    language: navigator.language,
+                    hasReferenceImage: fileInput.files.length > 0
+                };
+                
+                if (fileInput.files.length > 0) {
+                    // Convert image to base64
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        fallbackData.referenceImageBase64 = e.target.result;
+                        fallbackData.imageFileName = fileInput.files[0].name;
+                        fallbackData.imageFileSize = fileInput.files[0].size.toString();
+                        fallbackData.imageFileType = fileInput.files[0].type;
+                        
+                        // Try the fallback request
+                        attemptRequest({
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(fallbackData),
+                            mode: 'cors',
+                            credentials: 'omit'
+                        }, 2);
+                    };
+                    reader.readAsDataURL(fileInput.files[0]);
+                } else {
+                    // No image, try JSON request
+                    attemptRequest({
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(fallbackData),
+                        mode: 'cors',
+                        credentials: 'omit'
+                    }, 2);
+                }
+            } else {
+                // Final attempt failed or not a network error
+                generateButton.innerHTML = originalContent;
+                generateButton.disabled = false;
+                
+                // Show detailed error message
+                console.error('Final error details:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+                
+                // Additional debugging info
+                console.error('Request URL:', webhookUrl);
+                console.error('Final attempt number:', attemptNumber);
+            }
+        });
+    }
+    
+    // Start with the first attempt
+    attemptRequest(fetchOptions);
 }
 
 // Function to display generated image (if the API returns an image URL)
@@ -437,17 +504,37 @@ function testWebhook() {
     const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
     console.log('Testing webhook URL:', webhookUrl);
     
+    // Test GET request first
     fetch(webhookUrl, {
         method: 'GET',
         mode: 'cors'
     })
     .then(response => {
-        console.log('Test response status:', response.status);
+        console.log('GET test response status:', response.status);
         return response.text();
     })
     .then(data => {
-        console.log('Test response data:', data);
-        showNotification('Webhook test successful!', 'success');
+        console.log('GET test response data:', data);
+        showNotification('Webhook GET test successful!', 'success');
+        
+        // Now test POST with simple data
+        console.log('Testing POST request...');
+        return fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ test: 'data', timestamp: new Date().toISOString() }),
+            mode: 'cors'
+        });
+    })
+    .then(response => {
+        console.log('POST test response status:', response.status);
+        return response.text();
+    })
+    .then(data => {
+        console.log('POST test response data:', data);
+        showNotification('Webhook POST test successful!', 'success');
     })
     .catch(error => {
         console.error('Webhook test error:', error);
