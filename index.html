@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Commercial Producer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-video"></i>
+                <h1>AI Commercial Producer</h1>
+            </div>
+            <div class="header-subtitle">Professional AI-powered content creation</div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tab Navigation -->
+            <nav class="tab-navigation">
+                <button class="tab-button active" data-tab="text-to-image">
+                    <i class="fas fa-image"></i>
+                    <span>Text to Image</span>
+                </button>
+                <button class="tab-button" data-tab="text-to-video">
+                    <i class="fas fa-video"></i>
+                    <span>Text to Video</span>
+                </button>
+                <button class="tab-button" data-tab="image-to-video">
+                    <i class="fas fa-film"></i>
+                    <span>Image to Video</span>
+                </button>
+            </nav>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Text to Image Tab -->
+                <div id="text-to-image" class="tab-pane active">
+                    <div class="content-header">
+                        <h2>Text to Image Generation</h2>
+                        <p>Transform your creative vision into stunning visuals with AI-powered image generation.</p>
+                    </div>
+                    
+                    <div class="upload-section">
+                        <div class="upload-area" id="upload-area">
+                            <div class="upload-content">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h3>Upload Reference Image</h3>
+                                <p>Drag and drop your image here, or click to browse</p>
+                                <input type="file" id="image-upload" accept="image/*" hidden>
+                                <button type="button" class="browse-button" onclick="document.getElementById('image-upload').click()">
+                                    Browse Files
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-area" id="preview-area" style="display: none;">
+                            <div class="preview-image">
+                                <img id="preview-img" src="" alt="Preview">
+                                <button class="remove-image" onclick="removeImage()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-input-section">
+                        <label for="prompt-input">Describe your vision</label>
+                        <textarea 
+                            id="prompt-input" 
+                            placeholder="Describe the image you want to generate... (e.g., 'A modern smartphone showcasing premium features in a sleek studio setting')"
+                            rows="4"
+                        ></textarea>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="setting-group">
+                            <label for="style-select">Style</label>
+                            <select id="style-select">
+                                <option value="realistic">Realistic</option>
+                                <option value="artistic">Artistic</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="minimalist">Minimalist</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="quality-select">Quality</label>
+                            <select id="quality-select">
+                                <option value="standard">Standard</option>
+                                <option value="high">High</option>
+                                <option value="premium">Premium</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-section">
+                        <button class="generate-button" onclick="generateImage()">
+                            <i class="fas fa-magic"></i>
+                            <span>Generate Image</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text to Video Tab -->
+                <div id="text-to-video" class="tab-pane">
+                    <div class="content-header">
+                        <h2>Text to Video Generation</h2>
+                        <p>Create engaging video content from text descriptions using advanced AI technology.</p>
+                    </div>
+                    
+                    <div class="coming-soon">
+                        <i class="fas fa-video"></i>
+                        <h3>Coming Soon</h3>
+                        <p>Text to Video functionality will be available in the next update.</p>
+                    </div>
+                </div>
+
+                <!-- Image to Video Tab -->
+                <div id="image-to-video" class="tab-pane">
+                    <div class="content-header">
+                        <h2>Image to Video Generation</h2>
+                        <p>Transform static images into dynamic video content with AI animation.</p>
+                    </div>
+                    
+                    <div class="coming-soon">
+                        <i class="fas fa-film"></i>
+                        <h3>Coming Soon</h3>
+                        <p>Image to Video functionality will be available in the next update.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>&copy; 2024 AI Commercial Producer. Professional content creation powered by AI.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
