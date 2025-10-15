@@ -111,6 +111,7 @@ function generateImage() {
     const styleSelect = document.getElementById('style-select');
     const qualitySelect = document.getElementById('quality-select');
     const generateButton = document.querySelector('.generate-button');
+    const fileInput = document.getElementById('image-upload');
     
     // Get form values
     const prompt = promptInput.value.trim();
@@ -135,26 +136,86 @@ function generateImage() {
     generateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Generating...</span>';
     generateButton.disabled = true;
 
-    // Simulate API call (replace with actual API call)
-    setTimeout(() => {
+    // Prepare data for the webhook
+    const requestData = {
+        prompt: prompt,
+        style: style,
+        quality: quality,
+        timestamp: new Date().toISOString(),
+        hasReferenceImage: fileInput.files.length > 0
+    };
+
+    // Send request to n8n webhook
+    fetch('https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
         // Reset button state
         generateButton.innerHTML = originalContent;
         generateButton.disabled = false;
         
-        // Show success message (replace with actual result handling)
-        showNotification('Image generation completed! Check your results.', 'success');
+        // Show success message
+        showNotification('Image generation request sent successfully!', 'success');
         
-        // Here you would typically:
-        // 1. Send the data to your backend API
-        // 2. Handle the response
-        // 3. Display the generated image
-        console.log('Generation parameters:', {
-            prompt: prompt,
-            style: style,
-            quality: quality,
-            referenceImage: document.getElementById('image-upload').files[0] ? 'Uploaded' : 'None'
-        });
-    }, 3000);
+        // Log the response for debugging
+        console.log('Webhook response:', data);
+        
+        // Here you can handle the response data
+        // For example, if the API returns an image URL, you could display it
+        if (data.imageUrl) {
+            displayGeneratedImage(data.imageUrl);
+        }
+    })
+    .catch(error => {
+        // Reset button state
+        generateButton.innerHTML = originalContent;
+        generateButton.disabled = false;
+        
+        // Show error message
+        showNotification(`Error: ${error.message}`, 'error');
+        
+        console.error('Error calling webhook:', error);
+    });
+}
+
+// Function to display generated image (if the API returns an image URL)
+function displayGeneratedImage(imageUrl) {
+    // Create a results section if it doesn't exist
+    let resultsSection = document.querySelector('.results-section');
+    if (!resultsSection) {
+        resultsSection = document.createElement('div');
+        resultsSection.className = 'results-section';
+        resultsSection.innerHTML = `
+            <div class="content-header">
+                <h2>Generated Image</h2>
+            </div>
+            <div class="generated-image-container">
+                <img id="generated-image" src="" alt="Generated Image" style="display: none;">
+            </div>
+        `;
+        
+        // Insert after the action section
+        const actionSection = document.querySelector('.action-section');
+        actionSection.parentNode.insertBefore(resultsSection, actionSection.nextSibling);
+    }
+    
+    // Show the generated image
+    const generatedImage = document.getElementById('generated-image');
+    generatedImage.src = imageUrl;
+    generatedImage.style.display = 'block';
+    
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 // Notification System
