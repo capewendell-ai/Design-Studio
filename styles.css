@@ -415,6 +415,24 @@ body {
     transform: scale(1.02);
 }
 
+/* Preview Image Styles */
+.preview-image img {
+    max-width: 300px;
+    max-height: 200px;
+    display: block;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f8f9fa;
+}
+
+.preview-image img:not([src]) {
+    display: none;
+}
+
+.preview-image img[src=""] {
+    display: none;
+}
+
 /* Footer */
 .footer {
     background: #f8f9fa;
