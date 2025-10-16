@@ -96,10 +96,31 @@ document.addEventListener('DOMContentLoaded', function() {
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
+                    console.log('FileReader loaded, setting preview image...');
+                    
+                    // Clear any existing src first
+                    previewImg.src = '';
+                    
+                    // Set the new src
                     previewImg.src = e.target.result;
-                    uploadArea.style.display = 'none';
-                    previewArea.style.display = 'block';
-                    showNotification(`Image uploaded successfully: ${file.name}`, 'success');
+                    
+                    // Add load event listener to confirm image loaded
+                    previewImg.onload = function() {
+                        console.log('Preview image loaded successfully');
+                        uploadArea.style.display = 'none';
+                        previewArea.style.display = 'block';
+                        showNotification(`Image uploaded successfully: ${file.name}`, 'success');
+                    };
+                    
+                    // Add error event listener for image loading
+                    previewImg.onerror = function() {
+                        console.error('Preview image failed to load');
+                        showNotification('Image preview failed to load', 'error');
+                        // Reset to upload area
+                        uploadArea.style.display = 'block';
+                        previewArea.style.display = 'none';
+                    };
+                    
                 } catch (error) {
                     console.error('Error creating preview:', error);
                     showNotification('Error creating image preview', 'error');
@@ -125,10 +146,42 @@ function removeImage() {
     const uploadArea = document.getElementById('upload-area');
     const previewArea = document.getElementById('preview-area');
     const fileInput = document.getElementById('image-upload');
+    const previewImg = document.getElementById('preview-img');
+    
+    // Clear the image src
+    previewImg.src = '';
     
     uploadArea.style.display = 'block';
     previewArea.style.display = 'none';
     fileInput.value = '';
+    
+    console.log('Image removed, reset to upload area');
+}
+
+// Debug function for image preview
+function debugImagePreview() {
+    const previewImg = document.getElementById('preview-img');
+    const fileInput = document.getElementById('image-upload');
+    
+    console.log('=== IMAGE PREVIEW DEBUG ===');
+    console.log('Preview image element:', previewImg);
+    console.log('Preview image src:', previewImg.src);
+    console.log('Preview image complete:', previewImg.complete);
+    console.log('Preview image naturalWidth:', previewImg.naturalWidth);
+    console.log('Preview image naturalHeight:', previewImg.naturalHeight);
+    console.log('File input files length:', fileInput.files.length);
+    
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        console.log('File details:', {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified
+        });
+    }
+    
+    console.log('=== END DEBUG ===');
 }
 
 // Generate Image Function
@@ -564,13 +617,28 @@ function testWebhook() {
     const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
     console.log('=== WEBHOOK TEST START ===');
     console.log('Testing webhook URL:', webhookUrl);
+    console.log('Current page URL:', window.location.href);
+    console.log('Protocol:', window.location.protocol);
     
-    // Test 1: Simple GET request
-    console.log('Test 1: GET request');
+    // Test 0: Check if URL is reachable with different methods
+    console.log('Test 0: Checking URL accessibility');
+    
+    // Test with no-cors mode first
     fetch(webhookUrl, {
         method: 'GET',
-        mode: 'cors',
-        credentials: 'omit'
+        mode: 'no-cors'
+    })
+    .then(response => {
+        console.log('No-CORS test completed (response will be opaque)');
+        console.log('Response type:', response.type);
+        
+        // Now try with CORS
+        console.log('Test 1: GET request with CORS');
+        return fetch(webhookUrl, {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'omit'
+        });
     })
     .then(response => {
         console.log('GET test response status:', response.status);
@@ -656,7 +724,39 @@ function showTab(tabId) {
     }
 }
 
-// Add test button for debugging (remove in production)
+// Simple connectivity test
+function simpleTest() {
+    const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
+    
+    // Try opening in new window first
+    console.log('Opening webhook URL in new window...');
+    const newWindow = window.open(webhookUrl, '_blank');
+    
+    // Also try with XMLHttpRequest as fallback
+    setTimeout(() => {
+        console.log('Trying XMLHttpRequest...');
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', webhookUrl, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                console.log('XMLHttpRequest status:', xhr.status);
+                console.log('XMLHttpRequest response:', xhr.responseText);
+                if (xhr.status === 200) {
+                    showNotification('Webhook is reachable via XMLHttpRequest!', 'success');
+                } else {
+                    showNotification(`XMLHttpRequest failed: ${xhr.status}`, 'error');
+                }
+            }
+        };
+        xhr.onerror = function() {
+            console.error('XMLHttpRequest error');
+            showNotification('XMLHttpRequest failed: Network error', 'error');
+        };
+        xhr.send();
+    }, 1000);
+}
+
+// Add test buttons for debugging (remove in production)
 document.addEventListener('DOMContentLoaded', function() {
     // Add a test button for debugging webhook connectivity
     const testButton = document.createElement('button');
@@ -676,4 +776,42 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     testButton.onclick = testWebhook;
     document.body.appendChild(testButton);
+    
+    // Add a simple test button
+    const simpleTestButton = document.createElement('button');
+    simpleTestButton.textContent = 'Simple Test';
+    simpleTestButton.style.cssText = `
+        position: fixed;
+        top: 50px;
+        right: 10px;
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        z-index: 1000;
+    `;
+    simpleTestButton.onclick = simpleTest;
+    document.body.appendChild(simpleTestButton);
+    
+    // Add an image debug button
+    const imageDebugButton = document.createElement('button');
+    imageDebugButton.textContent = 'Debug Image';
+    imageDebugButton.style.cssText = `
+        position: fixed;
+        top: 90px;
+        right: 10px;
+        background: #ffc107;
+        color: black;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        z-index: 1000;
+    `;
+    imageDebugButton.onclick = debugImagePreview;
+    document.body.appendChild(imageDebugButton);
 });
