@@ -174,14 +174,32 @@ function generateImage() {
     
     // Add the uploaded image file if it exists
     if (fileInput.files.length > 0) {
-        formData.append('referenceImage', fileInput.files[0]);
+        const imageFile = fileInput.files[0];
+        
+        // Append the file with proper field name and filename
+        formData.append('referenceImage', imageFile, imageFile.name);
         formData.append('hasReferenceImage', 'true');
-        formData.append('imageFileName', fileInput.files[0].name);
-        formData.append('imageFileSize', fileInput.files[0].size.toString());
-        formData.append('imageFileType', fileInput.files[0].type);
-        console.log('Image file added:', fileInput.files[0].name, fileInput.files[0].size, 'bytes');
+        formData.append('imageFileName', imageFile.name);
+        formData.append('imageFileSize', imageFile.size.toString());
+        formData.append('imageFileType', imageFile.type);
+        
+        console.log('Image file added:', {
+            name: imageFile.name,
+            size: imageFile.size,
+            type: imageFile.type,
+            lastModified: imageFile.lastModified
+        });
+        
+        // Also add base64 version as backup
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            formData.append('referenceImageBase64', e.target.result);
+        };
+        reader.readAsDataURL(imageFile);
+        
     } else {
         formData.append('hasReferenceImage', 'false');
+        console.log('No image file selected');
     }
 
     // Send request to n8n webhook
@@ -190,7 +208,27 @@ function generateImage() {
     console.log('Sending request to:', webhookUrl);
     console.log('FormData contents:');
     for (let [key, value] of formData.entries()) {
-        console.log(key, value);
+        if (value instanceof File) {
+            console.log(`${key}:`, {
+                name: value.name,
+                size: value.size,
+                type: value.type,
+                lastModified: value.lastModified
+            });
+        } else {
+            console.log(`${key}:`, value);
+        }
+    }
+    
+    // Additional debug: Check if FormData has the file
+    console.log('FormData has referenceImage:', formData.has('referenceImage'));
+    console.log('File input files length:', fileInput.files.length);
+    if (fileInput.files.length > 0) {
+        console.log('First file details:', {
+            name: fileInput.files[0].name,
+            size: fileInput.files[0].size,
+            type: fileInput.files[0].type
+        });
     }
     
     // Try multiple approaches for sending data
@@ -198,14 +236,20 @@ function generateImage() {
         method: 'POST',
         body: formData,
         mode: 'cors',
-        credentials: 'omit' // Don't send cookies
+        credentials: 'omit', // Don't send cookies
+        headers: {
+            // Don't set Content-Type for FormData - let browser set it with boundary
+        }
     };
     
     console.log('Fetch options:', fetchOptions);
+    console.log('About to send request to:', webhookUrl);
     
     // Function to attempt the request
     function attemptRequest(options, attemptNumber = 1) {
-        console.log(`Attempt ${attemptNumber} with options:`, options);
+        console.log(`=== ATTEMPT ${attemptNumber} ===`);
+        console.log('URL:', webhookUrl);
+        console.log('Options:', options);
         
         return fetch(webhookUrl, options)
         .then(response => {
@@ -273,7 +317,22 @@ function generateImage() {
                         fallbackData.imageFileSize = fileInput.files[0].size.toString();
                         fallbackData.imageFileType = fileInput.files[0].type;
                         
+                        console.log('Fallback data prepared with base64 image');
+                        
                         // Try the fallback request
+                        attemptRequest({
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(fallbackData),
+                            mode: 'cors',
+                            credentials: 'omit'
+                        }, 2);
+                    };
+                    reader.onerror = function() {
+                        console.error('Failed to read image for base64 conversion');
+                        // Try without image
                         attemptRequest({
                             method: 'POST',
                             headers: {
@@ -287,6 +346,7 @@ function generateImage() {
                     reader.readAsDataURL(fileInput.files[0]);
                 } else {
                     // No image, try JSON request
+                    console.log('Fallback data prepared without image');
                     attemptRequest({
                         method: 'POST',
                         headers: {
@@ -502,43 +562,78 @@ document.addEventListener('keydown', function(e) {
 // Test webhook function (for debugging)
 function testWebhook() {
     const webhookUrl = 'https://n8n.srv901848.hstgr.cloud/webhook-test/text-to-image';
+    console.log('=== WEBHOOK TEST START ===');
     console.log('Testing webhook URL:', webhookUrl);
     
-    // Test GET request first
+    // Test 1: Simple GET request
+    console.log('Test 1: GET request');
     fetch(webhookUrl, {
         method: 'GET',
-        mode: 'cors'
+        mode: 'cors',
+        credentials: 'omit'
     })
     .then(response => {
         console.log('GET test response status:', response.status);
+        console.log('GET test response headers:', response.headers);
         return response.text();
     })
     .then(data => {
         console.log('GET test response data:', data);
         showNotification('Webhook GET test successful!', 'success');
         
-        // Now test POST with simple data
-        console.log('Testing POST request...');
+        // Test 2: POST with JSON
+        console.log('Test 2: POST with JSON');
         return fetch(webhookUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ test: 'data', timestamp: new Date().toISOString() }),
-            mode: 'cors'
+            mode: 'cors',
+            credentials: 'omit'
         });
     })
     .then(response => {
-        console.log('POST test response status:', response.status);
+        console.log('POST JSON test response status:', response.status);
+        console.log('POST JSON test response headers:', response.headers);
         return response.text();
     })
     .then(data => {
-        console.log('POST test response data:', data);
-        showNotification('Webhook POST test successful!', 'success');
+        console.log('POST JSON test response data:', data);
+        showNotification('Webhook POST JSON test successful!', 'success');
+        
+        // Test 3: POST with FormData (no file)
+        console.log('Test 3: POST with FormData (no file)');
+        const testFormData = new FormData();
+        testFormData.append('test', 'data');
+        testFormData.append('timestamp', new Date().toISOString());
+        
+        return fetch(webhookUrl, {
+            method: 'POST',
+            body: testFormData,
+            mode: 'cors',
+            credentials: 'omit'
+        });
+    })
+    .then(response => {
+        console.log('POST FormData test response status:', response.status);
+        console.log('POST FormData test response headers:', response.headers);
+        return response.text();
+    })
+    .then(data => {
+        console.log('POST FormData test response data:', data);
+        showNotification('Webhook POST FormData test successful!', 'success');
+        console.log('=== WEBHOOK TEST COMPLETE ===');
     })
     .catch(error => {
         console.error('Webhook test error:', error);
+        console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
         showNotification(`Webhook test failed: ${error.message}`, 'error');
+        console.log('=== WEBHOOK TEST FAILED ===');
     });
 }
 
